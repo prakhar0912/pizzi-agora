@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import AgoraRTC from "agora-rtc-sdk-ng"
-import { GlobalProvider, useClient, useStart, useUsers, useSpeaking } from './GlobalContext';
+import { GlobalProvider, useClient, useStart, useUsers, useSpeaking, useAudioEffects } from './GlobalContext';
 import Pizzicato from 'pizzicato'
 
 const App = () => {
@@ -15,6 +15,7 @@ const Content = () => {
   const setUsers = useUsers()[1]
   const [start, setStart] = useStart()
   const rtc = useClient()
+  const setAudioEffects = useAudioEffects()[1]
   const options = {
     // Pass your app ID here.
     appId: "",
@@ -24,22 +25,11 @@ const Content = () => {
     token: null,
   };
 
-  const modifyGain = (stream, gainValue) => {
-    var ctx = new AudioContext();
-    var src = ctx.createMediaStreamSource(stream);
-    var dst = ctx.createMediaStreamDestination();
-    var gainNode = ctx.createGain();
-    gainNode.gain.value = gainValue;
-    [src, gainNode, dst].reduce((a, b) => a && a.connect(b));
-    console.log(dst, Pizzicato.context)
-    Pizzicato.context.destination = dst.context.destination
-    return dst.stream;
-  };
 
   let init = async (name, appId) => {
     rtc.current.client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
     initClientEvents()
-    const uid = await rtc.current.client.join('947be50f01ff492d819d6c50a2cae705', name, options.token, null);
+    const uid = await rtc.current.client.join(appId, name, options.token, null);
     // Create an audio track from the audio sampled by a microphone.
     let option = true
 
@@ -56,14 +46,11 @@ const Content = () => {
         source: 'input',
         options: { volume: 1 }
       }, function () {
+        setAudioEffects((prevObj) => {
+          return { ...prevObj, voice: voice }
+        })
         voice.play();
       });
-      // var sound = new Pizzicato.Sound({
-      //   source: 'wave',
-      //   options: { type: 'sawtooth', frequency: 440, detached: false }
-      // });
-      // sound.play()
-      // sound.connect()
     }
     else {
       //Agora provided audio manipulation
@@ -168,6 +155,102 @@ const Content = () => {
     <div className="App">
       {start && <Videos />}
       {!start && <ChannelForm initFunc={init} />}
+      {start && <VoiceEffects />}
+    </div>
+  )
+}
+
+
+const VoiceEffects = () => {
+
+  const [audioEffects, setAudioEffects] = useAudioEffects()
+
+
+  let addEffects = (effect) => {
+    if (effect === 'Delay') {
+      // audioEffects.voice.addEffect(audioEffects.Delay.effect);
+      setAudioEffects((prevObj) => {
+        return {
+          ...prevObj, Delay: { ...prevObj.Delay, active: !prevObj.Delay.active }
+        }
+      })
+    }
+    if (effect === 'PingPongDelay') {
+      // audioEffects.voice.addEffect(audioEffects.PingPongDelay.effect);
+      setAudioEffects((prevObj) => {
+        return {
+          ...prevObj, PingPongDelay: { ...prevObj.PingPongDelay, active: !prevObj.PingPongDelay.active }
+        }
+      })
+    }
+    if (effect === 'Distortion') {
+      // audioEffects.voice.addEffect(audioEffects.Distortion.effect);
+      setAudioEffects((prevObj) => {
+        return {
+          ...prevObj, Distortion: { ...prevObj.Distortion, active: !prevObj.Distortion.active }
+        }
+      })
+    }
+    if (effect === 'Quadrafuzz') {
+      // audioEffects.voice.addEffect(audioEffects.Quadrafuzz.effect);
+      setAudioEffects((prevObj) => {
+        return {
+          ...prevObj, Quadrafuzz: { ...prevObj.Quadrafuzz, active: !prevObj.Quadrafuzz.active }
+        }
+      })
+    }
+    if (effect === 'Reverb') {
+      // audioEffects.voice.addEffect(audioEffects.Reverb.effect);
+      setAudioEffects((prevObj) => {
+        return {
+          ...prevObj, Reverb: { ...prevObj.Reverb, active: !prevObj.Reverb.active }
+        }
+      })
+    }
+    if (effect === 'LowPassFilter') {
+      setAudioEffects((prevObj) => {
+        return {
+          ...prevObj, LowPassFilter: { ...prevObj.LowPassFilter, active: !prevObj.LowPassFilter.active }
+        }
+      })
+    }
+    if(audioEffects[`${effect}`].active){
+      audioEffects.voice.removeEffect(audioEffects[`${effect}`].effect);
+    }
+    else{
+      audioEffects.voice.addEffect(audioEffects[`${effect}`].effect);
+    }
+
+  }
+
+  const soundUploaded = (event) => {
+    var files = event.target.files;
+    let sound = new Pizzicato.Sound({
+      source: 'file',
+      options: { path: URL.createObjectURL(files[0]) }
+    }, function () {
+      console.log('sound file loaded and started playing!');
+      sound.play()
+    });
+  }
+
+  return (
+    <div className='add-effect'>
+      <h4>Voice Effects</h4>
+      <div>
+        <button className={audioEffects.Delay.active ? 'onn' : 'offf'} onClick={() => addEffects('Delay')}>Delay</button>
+        <button className={audioEffects.PingPongDelay.active ? 'onn' : 'offf'} onClick={() => addEffects('PingPongDelay')}>PingPongDelay</button>
+        <button className={audioEffects.Distortion.active ? 'onn' : 'offf'} onClick={() => addEffects('Distortion')}>Distortion</button>
+      </div>
+      <div>
+        <button className={audioEffects.Quadrafuzz.active ? 'onn' : 'offf'} onClick={() => addEffects('Quadrafuzz')}>Quadrafuzz</button>
+        <button className={audioEffects.Reverb.active ? 'onn' : 'offf'} onClick={() => addEffects('Reverb')}>Reverb</button>
+        <button className={audioEffects.LowPassFilter.active ? 'onn' : 'offf'} onClick={() => addEffects('LowPassFilter')}>LowPassFilter</button>
+      </div>
+      <h4>Upload an audio file to play</h4>
+      <div>
+        <input onChange={(e) => { soundUploaded(e) }} type="file" id="upload" />
+      </div>
     </div>
   )
 }
